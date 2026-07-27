@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  --paper: #f6f4ef;
+  --surface: #fffefb;
+  --surface-2: #efece4;
+  --line: #e0dbd0;
+  --line-strong: #cdc6b8;
+  --ink: #1a1815;
+  --ink-muted: #6b6558;
+  --brand: #b04a24;
+  --brand-hover: #963d1c;
+  --brand-soft: #f7e7de;
+  --good: #2f7d52;
+  --good-soft: #e2f0e6;
+  --bad: #b3352c;
+  --bad-soft: #f8e3e0;
+  --warn: #9c6a10;
+  --warn-soft: #f8ecd4;
+  --ring: rgba(176, 74, 36, 0.35);
+}
+
+[data-theme='dark'] {
+  --paper: #141310;
+  --surface: #1c1a16;
+  --surface-2: #24211c;
+  --line: #33302a;
+  --line-strong: #45413a;
+  --ink: #f0ede6;
+  --ink-muted: #9a9385;
+  --brand: #e0713f;
+  --brand-hover: #ef8253;
+  --brand-soft: #3a251b;
+  --good: #6cc48d;
+  --good-soft: #1d3527;
+  --bad: #ef7a6d;
+  --bad-soft: #3a1f1c;
+  --warn: #dda93f;
+  --warn-soft: #38290f;
+  --ring: rgba(224, 113, 63, 0.4);
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-muted: var(--ink-muted);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-soft: var(--brand-soft);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: ui-serif, 'Iowan Old Style', 'Palatino Linotype', Georgia,
+    serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+html {
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+[data-theme='dark'] html,
+html[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
+}
+
+/* Native controls inherit the theme */
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Slim scrollbars for the scorecard grid */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 99px;
+  border: 3px solid var(--paper);
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-block {
+    break-inside: avoid;
+    box-shadow: none !important;
+    border-color: #bbb !important;
+  }
+  .print-full {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
