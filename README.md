@@ -1,5 +1,7 @@
 # Traction · EOS
 
+**Live: https://reachjason.github.io/eos-traction/**
+
 A local web app for running the Entrepreneurial Operating System from Gino Wickman's *Traction*.
 
 Everything lives in your browser's local storage. No accounts, no server, no network calls.
@@ -17,6 +19,13 @@ npm run build && npm run preview   # static build in dist/
 ```
 
 `dist/` is plain static files — drop it on any host, or open it behind any local web server.
+
+Pushes to `main` deploy to GitHub Pages automatically via `.github/workflows/deploy.yml`. The
+production build sets `GITHUB_PAGES=true` so Vite emits the `/eos-traction/` base path; local
+builds keep `/`. Routing is hash-based, so Pages needs no SPA rewrite rules.
+
+The hosted site is public, but **your data is not** — everything stays in your own browser's local
+storage and is never uploaded. Two people using the same URL see entirely separate data.
 
 ## What's in it
 
