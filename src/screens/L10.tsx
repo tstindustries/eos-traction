@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { SECTIONS, TOTAL_MINUTES, useMeeting } from '../lib/meeting'
 import {
@@ -12,7 +12,7 @@ import {
   Textarea,
   TrashIcon,
 } from '../components/ui'
-import { clsx, fmtLongDate, mmss, quarterOf, today, uid, weekEndingFor } from '../lib/util'
+import { addDays, clsx, fmtLongDate, mmss, quarterOf, today, uid, weekEndingFor } from '../lib/util'
 import { InfoTip } from '../components/InfoTip'
 import type { GlossaryKey } from '../lib/glossary'
 import { WeekEntry } from './Scorecard'
@@ -34,7 +34,12 @@ const SECTION_TIP: Record<string, GlossaryKey> = {
 export default function L10Screen() {
   const store = useStore()
   const m = useMeeting()
-  const week = weekEndingFor(today(), store.settings.weekEndsOn)
+  // The L10 reviews the LAST COMPLETED week: mid-week the current week has no numbers yet, so
+  // showing it looked like an empty scorecard. On the week-ending day itself that week counts.
+  const [weekOffset, setWeekOffset] = useState(0)
+  const thisWeekEnd = weekEndingFor(today(), store.settings.weekEndsOn)
+  const reviewWeek = thisWeekEnd === today() ? thisWeekEnd : addDays(thisWeekEnd, -7)
+  const week = addDays(reviewWeek, weekOffset * 7)
   const quarter = quarterOf(today(), store.settings.fyStartMonth)
 
   useEffect(() => {
@@ -63,6 +68,7 @@ export default function L10Screen() {
       cascading: m.cascading,
       issuesSolved: solvedNow,
       notes: m.notes,
+      scorecardWeek: week,
     })
     m.stop()
   }
@@ -125,7 +131,29 @@ export default function L10Screen() {
       )}
 
       {section.key === 'scorecard' && (
-        <Card title={`Week ending ${fmtLongDate(week)}`}>
+        <Card
+          title={`Week ending ${fmtLongDate(week)}${weekOffset === 0 ? ' · last completed week' : ''}`}
+          right={
+            <span className="flex items-center gap-1">
+              <IconButton label="Earlier week" onClick={() => setWeekOffset(weekOffset - 1)}>
+                ‹
+              </IconButton>
+              <IconButton
+                label="Later week"
+                onClick={() => setWeekOffset(weekOffset + 1)}
+                disabled={addDays(week, 7) > thisWeekEnd}
+                className="disabled:opacity-40"
+              >
+                ›
+              </IconButton>
+              {weekOffset !== 0 && (
+                <Button size="sm" variant="ghost" onClick={() => setWeekOffset(0)}>
+                  Back to last week
+                </Button>
+              )}
+            </span>
+          }
+        >
           <WeekEntry week={week} />
         </Card>
       )}

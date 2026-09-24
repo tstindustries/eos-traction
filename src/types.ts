@@ -115,6 +115,8 @@ export type Meeting = {
   cascading: string
   issuesSolved: ID[]
   notes: string
+  /** Week-ending date whose scorecard was reviewed in this meeting (tst fork). */
+  scorecardWeek?: string
 }
 
 export type Settings = {
