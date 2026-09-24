@@ -35,12 +35,15 @@ export function SyncBar({ className }: { className?: string }) {
   const busy = status !== 'idle'
   const newerOnServer = !!remote && remote.rev > rev
 
+  // Read the server stamp from the store AFTER save() ran: the `remote` captured at render time
+  // is whatever the last check saw, not what the save just found on the server.
   const afterSave = (r: SyncResult) => {
-    if (r === 'conflict' && remote)
+    const rem = useSync.getState().remote
+    if (r === 'conflict' && rem)
       setAsk({
         kind: 'overwrite',
-        title: `Server has v${remote.rev}`,
-        body: `${remote.updatedBy || 'Someone'} saved v${remote.rev} on ${fmtStamp(remote.updatedAt)}, newer than the v${rev} this browser started from. Save anyway as v${remote.rev + 1}, or Reload first to see their changes.`,
+        title: `Server has v${rem.rev}`,
+        body: `${rem.updatedBy || 'Someone'} saved v${rem.rev} on ${fmtStamp(rem.updatedAt)}, newer than the v${rev} this browser started from. Save anyway as v${rem.rev + 1}, or Reload first to see their changes.`,
       })
   }
 
@@ -55,12 +58,14 @@ export function SyncBar({ className }: { className?: string }) {
 
   const onReload = async () => {
     const r = await load()
-    if (r === 'dirty')
+    if (r === 'dirty') {
+      const rem = useSync.getState().remote
       setAsk({
         kind: 'discard',
         title: 'Unsaved changes',
-        body: `This browser has changes that were not saved. Reload v${remote?.rev ?? '?'} from the server and lose them?`,
+        body: `This browser has changes that were not saved. Reload ${rem ? `v${rem.rev}` : 'the server copy'} and lose them?`,
       })
+    }
   }
 
   const confirmAsk = async () => {
