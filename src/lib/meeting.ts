@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 
 export type SectionKey =
   | 'segue'
@@ -62,9 +63,11 @@ export const SECTIONS: {
 export const TOTAL_MINUTES = SECTIONS.reduce((n, s) => n + s.minutes, 0)
 
 /**
- * Live meeting state, deliberately NOT persisted: a meeting is either happening
- * now or it is a saved record. Kept outside the screen so navigating away and
- * back does not reset the clock.
+ * Live meeting state. Kept outside the screen so navigating away and back does not reset the
+ * clock, and persisted (tst fork) so a refresh, a closed tab or a crash mid-meeting does not throw
+ * away 90 minutes of ratings and notes: the meeting comes back paused where it was, and the record
+ * is still only written by "End meeting". `running` is not persisted, so a restored meeting
+ * always resumes with the clock stopped.
  */
 type LiveMeeting = {
   active: boolean
@@ -85,7 +88,9 @@ type LiveMeeting = {
   rate: (personId: string, score: number) => void
 }
 
-export const useMeeting = create<LiveMeeting>()((set, get) => ({
+export const useMeeting = create<LiveMeeting>()(
+  persist(
+    (set, get) => ({
   active: false,
   index: 0,
   running: false,
@@ -116,4 +121,18 @@ export const useMeeting = create<LiveMeeting>()((set, get) => ({
   goTo: (index) => set({ index: Math.max(0, Math.min(SECTIONS.length - 1, index)) }),
   set: (patch) => set(patch),
   rate: (personId, score) => set((s) => ({ ratings: { ...s.ratings, [personId]: score } })),
-}))
+    }),
+    {
+      name: 'eos-traction-meeting',
+      partialize: (s) => ({
+        active: s.active,
+        index: s.index,
+        elapsed: s.elapsed,
+        cascading: s.cascading,
+        notes: s.notes,
+        ratings: s.ratings,
+        issuesSolvedAtStart: s.issuesSolvedAtStart,
+      }),
+    },
+  ),
+)

@@ -37,10 +37,43 @@ const looksEmpty = (d: AppData) =>
 
 export type SyncResult = 'ok' | 'conflict' | 'dirty' | 'nothing' | 'error'
 
+/** One dated copy under history/, parsed from its file name `eos-r00012-20260924T140301Z.json`. */
+export type HistoryEntry = { name: string; rev: number; at: string; size: number | null }
+const HISTORY_NAME = /^eos-r(\d+)-(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z\.json$/
+
+/**
+ * Saved versions, newest first, from the server's JSON directory listing (nginx `autoindex_format
+ * json`, or any endpoint returning `[{name, size?}]`). null when the server does not list history.
+ */
+export async function listHistory(): Promise<HistoryEntry[] | null> {
+  try {
+    const r = await fetch(HISTORY_DIR, { cache: 'no-store', headers: { Accept: 'application/json' } })
+    if (!r.ok) return null
+    const items: unknown = await r.json()
+    if (!Array.isArray(items)) return null
+    return (items as { name?: unknown; size?: unknown }[])
+      .filter((x): x is { name: string; size?: unknown } => typeof x.name === 'string' && HISTORY_NAME.test(x.name))
+      .map((x) => {
+        const m = HISTORY_NAME.exec(x.name) as RegExpExecArray
+        return {
+          name: x.name,
+          rev: Number(m[1]),
+          at: `${m[2]}-${m[3]}-${m[4]}T${m[5]}:${m[6]}:${m[7]}Z`,
+          size: typeof x.size === 'number' ? x.size : null,
+        }
+      })
+      .sort((a, b) => b.rev - a.rev || b.at.localeCompare(a.at))
+  } catch {
+    return null
+  }
+}
+
 type SyncState = {
   status: 'idle' | 'checking' | 'loading' | 'saving'
-  /** Last error or notice, shown under the buttons. */
+  /** Last error, shown under the buttons. */
   message: string | null
+  /** Informational note (for example after loading an old version), shown under the buttons. */
+  notice: string | null
   /** Stamp of the document on the server as of the last check. null = nothing saved yet. */
   remote: SaveMeta | null
   /** Whether the server answered at all on the last check. */
@@ -56,6 +89,11 @@ type SyncState = {
   load: (force?: boolean) => Promise<SyncResult>
   /** Write local data to the server as the next revision. Refuses on a newer server copy unless forced. */
   save: (force?: boolean) => Promise<SyncResult>
+  /**
+   * Bring a saved version from history/ into this browser WITHOUT saving it, so the next Save makes
+   * it the current version. Refuses while dirty unless forced.
+   */
+  loadVersion: (entry: HistoryEntry, force?: boolean) => Promise<SyncResult>
   /** Start-up: check, and adopt the server copy when this browser holds nothing yet. */
   boot: () => Promise<void>
 }
@@ -92,6 +130,7 @@ async function fetchLatest(): Promise<{ doc: AppData | null; reachable: boolean;
 export const useSync = create<SyncState>()((set, get) => ({
   status: 'idle',
   message: null,
+  notice: null,
   remote: null,
   reachable: null,
   dirty: false,
@@ -119,7 +158,7 @@ export const useSync = create<SyncState>()((set, get) => ({
 
   load: async (force = false) => {
     if (get().dirty && !force) return 'dirty'
-    set({ status: 'loading', message: null })
+    set({ status: 'loading', message: null, notice: null })
     const { doc, reachable, error } = await fetchLatest()
     if (!doc) {
       set({ status: 'idle', reachable, message: error ?? 'Nothing has been saved to the shared location yet' })
@@ -132,7 +171,7 @@ export const useSync = create<SyncState>()((set, get) => ({
   },
 
   save: async (force = false) => {
-    set({ status: 'saving', message: null })
+    set({ status: 'saving', message: null, notice: null })
     const local = snapshot(useStore.getState())
     const { doc: remoteDoc, reachable, error } = await fetchLatest()
     if (!reachable) {
@@ -173,6 +212,35 @@ export const useSync = create<SyncState>()((set, get) => ({
     synced = fingerprint(snapshot(useStore.getState()))
     set({ status: 'idle', reachable: true, remote: meta, dirty: false, message: null })
     return 'ok'
+  },
+
+  loadVersion: async (entry, force = false) => {
+    if (get().dirty && !force) return 'dirty'
+    set({ status: 'loading', message: null, notice: null })
+    try {
+      const r = await fetch(HISTORY_DIR + entry.name, { cache: 'no-store' })
+      if (!r.ok) {
+        set({ status: 'idle', message: `Could not read v${entry.rev} (server answered ${r.status})` })
+        return 'error'
+      }
+      const parsed: unknown = await r.json()
+      if (!isDoc(parsed)) {
+        set({ status: 'idle', message: `v${entry.rev} is not an EOS export` })
+        return 'error'
+      }
+      useStore.getState().replaceAll(parsed)
+      // `synced` is left as the CURRENT server copy on purpose: the old version counts as unsaved
+      // changes until Save makes it the newest revision.
+      set({
+        status: 'idle',
+        dirty: fingerprint(snapshot(useStore.getState())) !== synced,
+        notice: `Loaded v${entry.rev} from ${new Date(entry.at).toLocaleString()} into this browser. It is not saved yet: press Save to make it the current version, or Reload Previous Save to drop it.`,
+      })
+      return 'ok'
+    } catch {
+      set({ status: 'idle', reachable: false, message: 'Could not reach the shared location' })
+      return 'error'
+    }
   },
 
   boot: async () => {

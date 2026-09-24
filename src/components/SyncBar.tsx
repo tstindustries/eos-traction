@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store'
-import { useSync, LATEST_URL, type SyncResult } from '../lib/sync'
+import { useSync, listHistory, LATEST_URL, type HistoryEntry, type SyncResult } from '../lib/sync'
 import { Button, Modal } from './ui'
 import { clsx } from '../lib/util'
 
@@ -14,7 +14,13 @@ const fmtStamp = (iso: string) =>
       })
     : 'never'
 
-type Ask = { kind: 'overwrite' | 'discard'; title: string; body: string } | null
+type Ask =
+  | { kind: 'overwrite'; title: string; body: string }
+  | { kind: 'discard'; title: string; body: string }
+  | { kind: 'loadVersion'; title: string; body: string; entry: HistoryEntry }
+  | null
+
+const fmtSize = (n: number | null) => (n === null ? '' : `${Math.max(1, Math.round(n / 1024))} KB`)
 
 /**
  * The corner widget: data version, when and by whom it was last saved, and the two buttons that
@@ -25,10 +31,13 @@ export function SyncBar({ className }: { className?: string }) {
   const updatedAt = useStore((s) => s.updatedAt ?? '')
   const updatedBy = useStore((s) => s.updatedBy ?? '')
   const sampleMode = useStore((s) => s.sampleMode)
-  const { status, message, remote, reachable, dirty, name, setName, load, save } = useSync()
+  const { status, message, notice, remote, reachable, dirty, name, setName, load, save, loadVersion } =
+    useSync()
   const [ask, setAsk] = useState<Ask>(null)
   const [nameOpen, setNameOpen] = useState(false)
   const [draftName, setDraftName] = useState(name)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [history, setHistory] = useState<HistoryEntry[] | null | 'loading'>('loading')
 
   if (sampleMode) return null
 
@@ -73,7 +82,26 @@ export function SyncBar({ className }: { className?: string }) {
     setAsk(null)
     if (!a) return
     if (a.kind === 'overwrite') await save(true)
+    else if (a.kind === 'loadVersion') await loadVersion(a.entry, true)
     else await load(true)
+  }
+
+  const openHistory = async () => {
+    setHistoryOpen(true)
+    setHistory('loading')
+    setHistory(await listHistory())
+  }
+
+  const pickVersion = async (entry: HistoryEntry) => {
+    setHistoryOpen(false)
+    const r = await loadVersion(entry)
+    if (r === 'dirty')
+      setAsk({
+        kind: 'loadVersion',
+        entry,
+        title: 'Unsaved changes',
+        body: `This browser has changes that were not saved. Load v${entry.rev} from ${fmtStamp(entry.at)} and lose them? Nothing is written to the server until you press Save.`,
+      })
   }
 
   const saveName = async () => {
@@ -113,12 +141,17 @@ export function SyncBar({ className }: { className?: string }) {
             variant={newerOnServer ? 'primary' : 'default'}
             onClick={onReload}
             disabled={busy}
+            title="Replace what is in this browser with the last saved copy on the server"
           >
-            {status === 'loading' ? 'Loading…' : 'Reload'}
+            {status === 'loading' ? 'Loading…' : 'Reload Previous Save'}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={openHistory} disabled={busy} title="Load an earlier saved version">
+            History
           </Button>
         </span>
       </div>
       {message && <p className="max-w-sm text-right text-xs text-bad">{message}</p>}
+      {notice && <p className="max-w-sm text-right text-xs text-muted">{notice}</p>}
 
       <Modal open={!!ask} onClose={() => setAsk(null)} title={ask?.title ?? ''}>
         <p className="text-sm">{ask?.body}</p>
@@ -128,6 +161,41 @@ export function SyncBar({ className }: { className?: string }) {
             {ask?.kind === 'overwrite' ? 'Save anyway' : 'Reload and discard'}
           </Button>
         </div>
+      </Modal>
+
+      <Modal open={historyOpen} onClose={() => setHistoryOpen(false)} title="Saved versions">
+        {history === 'loading' && <p className="text-sm text-muted">Loading…</p>}
+        {history === null && (
+          <p className="text-sm text-muted">This server does not list saved versions.</p>
+        )}
+        {Array.isArray(history) && history.length === 0 && (
+          <p className="text-sm text-muted">No saved versions yet. Every Save adds one.</p>
+        )}
+        {Array.isArray(history) && history.length > 0 && (
+          <>
+            <p className="mb-3 text-sm text-muted">
+              Loading a version replaces what is in this browser only. Press Save afterwards to make it the
+              current version for everyone.
+            </p>
+            <ul className="max-h-80 divide-y divide-line overflow-y-auto">
+              {history.map((h) => (
+                <li key={h.name} className="flex items-center gap-3 py-2 text-sm">
+                  <span className="w-12 shrink-0 font-mono font-semibold tabular-nums">v{h.rev}</span>
+                  <span className="min-w-0 flex-1 truncate text-muted">
+                    {fmtStamp(h.at)}
+                    {fmtSize(h.size) && <span className="ml-2 text-xs">{fmtSize(h.size)}</span>}
+                    {remote && h.rev === remote.rev && (
+                      <span className="ml-2 text-xs font-medium text-brand">current</span>
+                    )}
+                  </span>
+                  <Button size="sm" onClick={() => pickVersion(h)}>
+                    Load
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
       </Modal>
 
       <Modal open={nameOpen} onClose={() => setNameOpen(false)} title="Who is saving?">

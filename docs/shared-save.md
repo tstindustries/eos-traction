@@ -1,9 +1,9 @@
 # Shared save (TST fork)
 
-The upstream app keeps everything in one browser's localStorage. This fork adds a **Save** and a
-**Reload** button in the top-right corner, a data **version** that goes up by one on every Save,
-and an **updated at / by** stamp, so a small team can share one copy of the data through any web
-server that can serve and accept a file.
+The upstream app keeps everything in one browser's localStorage. This fork adds **Save**,
+**Reload Previous Save** and **History** buttons in the top-right corner, a data **version** that goes
+up by one on every Save, and an **updated at / by** stamp, so a small team can share one copy of the
+data through any web server that can serve and accept a file.
 
 Nothing changes in the screens. Nothing saves on its own. Export and Import still work and now
 carry the stamp too.
@@ -15,12 +15,14 @@ carry the stamp too.
 | Stamp on the document | `rev`, `updatedAt`, `updatedBy` in `AppData` (`src/types.ts`) | Travels with exports; `rev` 0 means never saved |
 | Transport | `src/lib/sync.ts` | `GET <base>/eos-latest.json` and `PUT <base>/eos-latest.json`; on each save also `PUT <base>/history/eos-r00012-20260924T140301Z.json` (best effort) |
 | Base URL | `VITE_SYNC_BASE` at build time, default `/data` | Same origin, so no CORS |
-| Corner widget | `src/components/SyncBar.tsx`, mounted in `src/App.tsx` | Version, stamp, unsaved-changes dot, "vN on server" hint, Save, Reload |
+| Corner widget | `src/components/SyncBar.tsx`, mounted in `src/App.tsx` | Version, stamp, unsaved-changes dot, "vN on server" hint, Save, Reload Previous Save, History |
+| History | `GET <base>/history/` as JSON (`[{name, size}]`, nginx `autoindex_format json`) | Lists saved versions; Load brings one into the browser unsaved, Save then makes it the newest revision (the undo for an accidental save) |
 | Name of the saver | Settings > Shared save; kept in this browser's localStorage under `eos-sync-name` | Asked for on the first Save if empty |
 
 Save first reads the server copy. If the server holds a higher `rev` than the one this browser
-started from, the widget asks before overwriting. Reload asks before discarding unsaved local
-changes. At start-up the app reads the server copy once: an empty browser adopts it, a browser
+started from, the widget asks before overwriting. Reload Previous Save asks before discarding unsaved
+local changes. History loads an older version as unsaved changes, so restoring after an accidental save
+is Load, check, Save. At start-up the app reads the server copy once: an empty browser adopts it, a browser
 with data only shows "vN on server".
 
 The transport is deliberately dumb so the server can be anything:
