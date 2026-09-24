@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { clsx } from './lib/util'
 import { Modal } from './components/ui'
+import { SyncBar } from './components/SyncBar'
+import { useSync } from './lib/sync'
 import Dashboard from './screens/Dashboard'
 import VtoScreen from './screens/Vto'
 import RocksScreen from './screens/Rocks'
@@ -142,6 +144,11 @@ export default function App() {
   const sampleMode = useStore((s) => s.sampleMode)
   const exitSampleMode = useStore((s) => s.exitSampleMode)
 
+  // One read at start-up: show the server's version, and adopt it if this browser is empty.
+  useEffect(() => {
+    void useSync.getState().boot()
+  }, [])
+
   useEffect(() => {
     const onHash = () => {
       setRoute(readHash())
@@ -241,6 +248,9 @@ export default function App() {
             </button>
           </div>
         )}
+        <div className="no-print flex justify-end px-4 pt-3 sm:px-6">
+          <SyncBar />
+        </div>
         <Screen />
       </main>
 

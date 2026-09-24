@@ -126,8 +126,21 @@ export type Settings = {
   theme: 'system' | 'light' | 'dark'
 }
 
+/** Who saved the document last, and which save it was. Travels with exports. */
+export type SaveMeta = {
+  /** Increments by one on every Save to the shared location; 0 = never saved. */
+  rev: number
+  /** ISO timestamp of that save. */
+  updatedAt: string
+  /** Display name typed in Settings by whoever pressed Save. */
+  updatedBy: string
+}
+
 export type AppData = {
   version: number
+  rev?: number
+  updatedAt?: string
+  updatedBy?: string
   settings: Settings
   people: Person[]
   vto: Vto

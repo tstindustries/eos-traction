@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
-import { DATA_VERSION, useStore } from '../store'
+import { snapshot, useStore } from '../store'
 import type { AppData } from '../types'
+import { LATEST_URL, useSync } from '../lib/sync'
 import { Button, Card, Field, Input, Page, Segmented, Select } from '../components/ui'
 import { MONTHS, WEEKDAYS, today } from '../lib/util'
 
@@ -12,22 +13,11 @@ export default function SettingsScreen() {
   const [msg, setMsg] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
 
+  const syncName = useSync((s) => s.name)
+  const setSyncName = useSync((s) => s.setName)
+
   const exportJson = () => {
-    const { people, vto, seats, rocks, measurables, issues, todos, headlines, meetings } =
-      useStore.getState()
-    const data: AppData = {
-      version: DATA_VERSION,
-      settings,
-      people,
-      vto,
-      seats,
-      rocks,
-      measurables,
-      issues,
-      todos,
-      headlines,
-      meetings,
-    }
+    const data: AppData = snapshot(useStore.getState())
     const url = URL.createObjectURL(
       new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }),
     )
@@ -52,8 +42,29 @@ export default function SettingsScreen() {
   }
 
   return (
-    <Page title="Settings" subtitle="All data lives in this browser's local storage. Nothing is sent anywhere.">
+    <Page
+      title="Settings"
+      subtitle="Data lives in this browser until you press Save, which writes it to the shared location."
+    >
       <div className="space-y-4">
+        <Card title="Shared save">
+          <div className="space-y-4 p-4">
+            <p className="text-sm text-muted">
+              Save writes the whole document to{' '}
+              <span className="font-mono text-xs text-ink">{LATEST_URL}</span> as the next version
+              and keeps a dated copy under <span className="font-mono text-xs text-ink">history/</span>.
+              Reload replaces what is in this browser with that file. Nothing saves on its own.
+            </p>
+            <Field label="Your name" hint="Recorded on each save so the team can see who last changed the shared copy.">
+              <Input
+                value={syncName}
+                onChange={(e) => setSyncName(e.target.value)}
+                placeholder="First name"
+              />
+            </Field>
+          </div>
+        </Card>
+
         <Card title="Company">
           <div className="space-y-4 p-4">
             <Field label="Company name">

@@ -10,6 +10,7 @@ import type {
   Meeting,
   Person,
   Rock,
+  SaveMeta,
   Seat,
   Settings,
   Todo,
@@ -37,6 +38,9 @@ const emptyVto = (): Vto => ({
 
 export const emptyData = (): AppData => ({
   version: DATA_VERSION,
+  rev: 0,
+  updatedAt: '',
+  updatedBy: '',
   settings: {
     companyName: '',
     fyStartMonth: 1,
@@ -52,6 +56,24 @@ export const emptyData = (): AppData => ({
   todos: [],
   headlines: [],
   meetings: [],
+})
+
+/** The exportable document: everything that is data, nothing that is UI state. */
+export const snapshot = (s: AppData): AppData => ({
+  version: DATA_VERSION,
+  rev: s.rev ?? 0,
+  updatedAt: s.updatedAt ?? '',
+  updatedBy: s.updatedBy ?? '',
+  settings: s.settings,
+  people: s.people,
+  vto: s.vto,
+  seats: s.seats,
+  rocks: s.rocks,
+  measurables: s.measurables,
+  issues: s.issues,
+  todos: s.todos,
+  headlines: s.headlines,
+  meetings: s.meetings,
 })
 
 type Actions = {
@@ -114,6 +136,8 @@ type Actions = {
   /* data */
   replaceAll: (data: AppData) => void
   reset: () => void
+  /** Stamp the document after a Save to the shared location. */
+  setSaveMeta: (meta: SaveMeta) => void
 
   /* sample mode */
   enterSampleMode: () => void
@@ -375,6 +399,7 @@ export const useStore = create<Store>()(
       replaceAll: (data) =>
         set(() => ({ ...emptyData(), ...data, version: DATA_VERSION, sampleMode: false })),
       reset: () => set(() => ({ ...emptyData(), sampleMode: false, stashed: null })),
+      setSaveMeta: (meta) => set(() => ({ ...meta })),
 
       /**
        * Sample mode stashes whatever you already have and hands back a
@@ -384,11 +409,7 @@ export const useStore = create<Store>()(
       enterSampleMode: () => {
         const s = get()
         if (s.sampleMode) return
-        const { settings, people, vto, seats, rocks, measurables, issues, todos, headlines, meetings } = s
-        const stashed: AppData = {
-          version: DATA_VERSION,
-          settings, people, vto, seats, rocks, measurables, issues, todos, headlines, meetings,
-        }
+        const stashed = snapshot(s)
         set({ ...sampleData(), sampleMode: true, stashed })
       },
       exitSampleMode: () => {
